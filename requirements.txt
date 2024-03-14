@@ -1,0 +1,7 @@
+numpy
+scipy
+matplotlib
+pandas
+pytorch
+tensorboard
+einops
