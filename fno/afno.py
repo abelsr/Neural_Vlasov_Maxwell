@@ -1,6 +1,6 @@
 import torch.nn as nn
-from spectral_convolution import AdaptiveSpectralConvolution
-from mlp import MLP
+from .spectral_convolution import AdaptiveSpectralConvolution
+from .mlp import MLP
 from timm.models.layers import DropPath
 
 class FourierBlock(nn.Module):

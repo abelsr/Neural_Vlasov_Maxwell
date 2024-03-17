@@ -5,8 +5,8 @@ import torch
 import torch.nn as nn
 from torch.utils.checkpoint import checkpoint_sequential
 from timm.models.layers import trunc_normal_
-from patch_embedding import PatchEmbedding
-from afno import FourierBlock
+from .patch_embedding import PatchEmbedding
+from .afno import FourierBlock
 
 class AdaptiveFourierNeuralOperator(nn.Module):
     """
