@@ -12,7 +12,7 @@ class AdaptiveFourierNeuralOperator(nn.Module):
     """
     Adaptive Fourier Neural Operator (AFNO) model.
     """
-    def __init__(self, img_size: list[int], patch_size: Union[int, List[int]] = 4, in_channels: int = 1, out_channels: int = 1, embed_dim: int = 768, num_layers: int = 12, mlp_ratio: float = 4, uniform_drop: bool = False, drop_rate: float = 0, drop_path_rate: float = 0, norm_layer: nn.Module = None, dropcls: int = 0, checkpoints: bool = False):
+    def __init__(self, img_size: list[int], patch_size: Union[int, List[int]] = 8, in_channels: int = 1, out_channels: int = 1, embed_dim: int = 768, num_layers: int = 12, mlp_ratio: float = 4, uniform_drop: bool = False, drop_rate: float = 0, drop_path_rate: float = 0, norm_layer: nn.Module = None, dropcls: int = 0, checkpoints: bool = False):
         """
         Args:
         -----
@@ -98,7 +98,7 @@ class AdaptiveFourierNeuralOperator(nn.Module):
                 ('conv2', nn.ConvTranspose1d(self.out_channels*16, self.out_channels*4, kernel_size=2, stride=2)),
                 ('act2', nn.Tanh()),
             ]))
-            self.head = nn.ConvTranspose1d(self.out_channels*4, self.out_channels, kernel_size=1, stride=1)
+            self.head = nn.ConvTranspose1d(self.out_channels*4, self.out_channels, kernel_size=2, stride=2)
         elif len(self.img_size) == 2:
             self.decoder = nn.Sequential(OrderedDict([
                 ('conv1', nn.ConvTranspose2d(self.embed_dim, self.out_channels*16, kernel_size=(2, 2), stride=(2, 2))),
@@ -106,7 +106,7 @@ class AdaptiveFourierNeuralOperator(nn.Module):
                 ('conv2', nn.ConvTranspose2d(self.out_channels*16, self.out_channels*4, kernel_size=(2, 2), stride=(2, 2))),
                 ('act2', nn.Tanh()),
             ]))
-            self.head = nn.ConvTranspose2d(self.out_channels*4, self.out_channels, kernel_size=(1, 1), stride=(1, 1))
+            self.head = nn.ConvTranspose2d(self.out_channels*4, self.out_channels, kernel_size=(2, 2), stride=(2, 2))
         elif len(self.img_size) == 3:
             self.decoder = nn.Sequential(OrderedDict([
                 ('conv1', nn.ConvTranspose3d(self.embed_dim, self.out_channels*16, kernel_size=(2, 2, 2), stride=(2, 2, 2))),
@@ -114,7 +114,7 @@ class AdaptiveFourierNeuralOperator(nn.Module):
                 ('conv2', nn.ConvTranspose3d(self.out_channels*16, self.out_channels*4, kernel_size=(2, 2, 2), stride=(2, 2, 2))),
                 ('act2', nn.Tanh()),
             ]))
-            self.head = nn.ConvTranspose3d(self.out_channels*4, self.out_channels, kernel_size=(1, 1, 1), stride=(1, 1, 1))
+            self.head = nn.ConvTranspose3d(self.out_channels*4, self.out_channels, kernel_size=(2, 2, 2), stride=(2, 2, 2))
             
         if dropcls > 0:
             self.final_dropout = nn.Dropout(p=dropcls)
