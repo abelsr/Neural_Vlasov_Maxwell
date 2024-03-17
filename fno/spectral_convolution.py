@@ -32,9 +32,9 @@ class AdaptiveSpectralConvolution(nn.Module):
         self.scale = scale                  # Scaling factor for the weights
         
         # Weights and biases
-        self.w1 = nn.Parameter(self.scale * torch.randn(self.dimensions, self.num_blocks, self.block_size, self.block_size))
+        self.w1 = nn.Parameter(self.scale * torch.randn(2, self.num_blocks, self.block_size, self.block_size))
         self.b1 = nn.Parameter(self.scale * torch.randn(self.num_blocks, self.block_size))
-        self.w2 = nn.Parameter(self.scale * torch.randn(self.dimensions, self.num_blocks, self.block_size, self.block_size))
+        self.w2 = nn.Parameter(self.scale * torch.randn(2, self.num_blocks, self.block_size, self.block_size))
         self.b2 = nn.Parameter(self.scale * torch.randn(self.num_blocks, self.block_size))
         
         self.activation = activation
