@@ -1,15 +1,17 @@
 import torch
 import torch.nn as nn
-from typing import Tuple, List, Union
+from typing import List, Union
 
 class PatchEmbedding(nn.Module):
     """
     PatchEmbedding module that converts an input image into a sequence of patches.
+    ```python
     Example:
         # Example usage
         x = torch.randn(1, 1, x1, ..., xN)
         patch_embed = PatchEmbedding(img_size=(x1, ..., xN), patch_size=8, in_channels=1, embed_dim=768)
-        x = patch_embed(x)
+        x = patch_embed(x) # (1, num_patches, embed_dim)
+    ```
     """
     def __init__(self, img_size: tuple, patch_size: Union[int, List[int]], in_channels: int, embed_dim: int):
         """
@@ -66,6 +68,6 @@ class PatchEmbedding(nn.Module):
             torch.Tensor: Output tensor.
         """
         batch_size, channels, *data_shape = x.shape
-        assert data_shape == self.img_size, "Input tensor has wrong shape"
+        assert data_shape == self.img_size, f"Input tensor has wrong shape, expected {self.img_size} but got {data_shape}"
         x = self.proj(x).flatten(2).transpose(1, 2)
         return x
