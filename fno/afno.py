@@ -25,14 +25,23 @@ class FourierBlock(nn.Module):
     def __init__(self, dim: int, img_size: list[int], mlp_ratio: float = 4.0, drop: float = 0.0, drop_path: float = 0.0, act_layer: nn.Module = nn.GELU, norm_layer: nn.Module = nn.LayerNorm, double_skip: bool = False):
         """    
         Args:
-            dim (int): The number of input channels.
-            img_size (list[int]): The size of the input image.
-            mlp_ratio (float, optional): The ratio of hidden units in the MLP layer to the input channels. Default is 4.0.
-            drop (float, optional): The dropout rate. Default is 0.0.
-            drop_path (float, optional): The dropout rate for the skip connection. Default is 0.0.
-            act_layer (torch.nn.Module, optional): The activation function to be used. Default is nn.GELU.
-            norm_layer (torch.nn.Module, optional): The normalization layer to be used. Default is nn.LayerNorm.
-            double_skip (bool, optional): Whether to perform double skip connection. Default is False.
+        --------
+        * dim (int): 
+            The number of input channels.
+        * img_size (list[int]): 
+            The size of the input image.
+        * mlp_ratio (float, optional):
+            The ratio of hidden units in the MLP layer to the input channels. Default is 4.0.
+        * drop (float, optional): 
+            The dropout rate. Default is 0.0.
+        * drop_path (float, optional): 
+            The dropout rate for the skip connection. Default is 0.0.
+        * act_layer (torch.nn.Module, optional): 
+            The activation function to be used. Default is nn.GELU.
+        * norm_layer (torch.nn.Module, optional): 
+            The normalization layer to be used. Default is nn.LayerNorm.
+        * double_skip (bool, optional): 
+            Whether to perform double skip connection. Default is False.
         """
         super().__init__()
         self.dim = dim
