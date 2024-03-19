@@ -5,3 +5,4 @@ pandas
 pytorch
 tensorboard
 einops
+timm
