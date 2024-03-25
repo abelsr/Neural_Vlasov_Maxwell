@@ -39,6 +39,7 @@ class AdaptiveSpectralConvolution(nn.Module):
         
         self.activation = activation
         
+        # Bias and softshrink
         self.bias = nn.Conv1d(self.hidden_size, self.hidden_size, 1)
         self.softshrink = softshrink
         
@@ -53,7 +54,7 @@ class AdaptiveSpectralConvolution(nn.Module):
         Returns:
             torch.Tensor: Result of complex multiplication.
         """
-        assert input.shape[-1] == weights.shape[-2], "Input and weight dimensions do not match"
+        assert input.shape[-1] == weights.shape[-2], f"Input and weight dimensions do not match. The last dimension of input is {input.shape[-1]} and the second-to-last dimension of weights is {weights.shape[-2]}"
         return torch.einsum('...bd, bdk -> ...bk', input, weights)
     
     def forward(self, x: torch.Tensor) -> torch.Tensor:
