@@ -49,7 +49,8 @@ class AdaptiveFourierNeuralOperator(nn.Module):
         self.img_size = img_size
         assert len(self.img_size) in [1, 2, 3], "Image dimensions must be 1, 2 or 3 dimensions. Higher dimensions are not supported yet."
         self.patch_size = patch_size
-        self.in_channels = in_channels
+        self.in_channels = in_channels + len(img_size)
+        self.dim = len(img_size)
         self.out_channels = out_channels
         self.embed_dim = embed_dim
         self.num_layers = num_layers
@@ -164,17 +165,33 @@ class AdaptiveFourierNeuralOperator(nn.Module):
         Returns:
             torch.Tensor: Output tensor of shape (B, embed_dim, x1', ..., xN'), where B is the batch size, embed_dim is the embedding dimension, and x1', ..., xN' are the dimensions of the output image.
         """
-        B = x.shape[0]
+        batch, channels, *sizes = x.shape
+        
+        # Grid addition
+        for i in range(len(sizes)):
+            self.set_grid(x)
+            if sizes[i] != self.sizes[i]:
+                break        
+        x = x.reshape(batch, *sizes, channels)
+        reshapes = [1] * len(x.size())
+        reshapes[0] = batch
+        batched_grid = [grid.repeat(reshapes) for grid in self.grids]
+        x = torch.cat((*batched_grid, x), dim=-1)
+        x = x.permute(0, -1, *range(1, len(x.size())-1))
+        
+        # Patch embedding
         x = self.patch_embed(x)
         x += self.pos_embed
         x = self.pos_drop(x)
         
+        # Fourier blocks
         if not self.checkpoints:
             for blk in self.blocks:
                 x = blk(x)
         else:
             x = checkpoint_sequential(self.blocks, 4, x)
         
+        # Norm layer
         x = self.norm(x).transpose(1, 2)
         x = torch.reshape(x, [-1, self.embed_dim, *self.size])
         return x
@@ -194,3 +211,17 @@ class AdaptiveFourierNeuralOperator(nn.Module):
         x = self.decoder(x)
         x = self.head(x)
         return x
+    
+    def set_grid(self, x):
+        batch, channels, *sizes = x.size()
+        self.grids = []
+        self.sizes = sizes
+        
+        # Create a grid
+        for dim in range(self.dim):
+            new_shape = [1] * (self.dim + 2)
+            new_shape[dim + 1] = sizes[dim]
+            repeats = [1] + sizes + [1]
+            repeats[dim + 1] = 1
+            grid = torch.linspace(0, 1, sizes[dim], requires_grad=True, device=x.device, dtype=torch.float).reshape(new_shape).repeat(repeats).clone().detach()
+            self.grids.append(grid)
