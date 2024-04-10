@@ -11,23 +11,22 @@ class AdaptiveSpectralConvolution(nn.Module):
     It applies a series of complex multiplications and activations to transform the input tensor.
 
     Args:
-        dim (int): Hidden channels.
+        in_channels (int): Input channels.
         size (tuple): Size of the input tensor.
         num_blocks (int, optional): Number of blocks. Defaults to 4.
         activation (function, optional): Activation function. Defaults to F.relu.
         scale (float, optional): Scaling factor for the weights. Defaults to 0.02.
         softshrink (float, optional): Softshrink parameter for activation. Defaults to 0.5.
     """
-    def __init__(self, dim: int , size: List[int], num_blocks:int = 4, activation: nn.Module = F.relu, scale: float = 0.02, softshrink: float = 0.5):
+    def __init__(self, in_channels: int , dim: int, num_blocks:int = 4, activation: nn.Module = F.relu, scale: float = 0.02, softshrink: float = 0.5):
         super().__init__()
-        self.hidden_size = dim              # Hidden channels
-        self.size = size                    # Size of the input (we also infer the dimensionality from this)
-        self.dimensions = len(size)         # Number of dimensions
-        self.num_blocks = num_blocks        # Number of blocks
-        self.block_size = self.hidden_size // self.num_blocks
+        self.in_channels = in_channels                               # Hidden channels
+        self.dimensions  = dim                                       # Number of dimensions
+        self.num_blocks  = num_blocks                                # Number of blocks
+        self.block_size  = self.in_channels // self.num_blocks
         
         # Check if the hidden size is divisible by the number of blocks
-        assert self.hidden_size % self.num_blocks == 0, "Hidden size must be divisible by the number of blocks"
+        assert self.in_channels % self.num_blocks == 0, "Hidden size must be divisible by the number of blocks"
         
         self.scale = scale                  # Scaling factor for the weights
         
@@ -40,7 +39,7 @@ class AdaptiveSpectralConvolution(nn.Module):
         self.activation = activation
         
         # Bias and softshrink
-        self.bias = nn.Conv1d(self.hidden_size, self.hidden_size, 1)
+        self.bias = nn.Conv1d(self.in_channels, self.in_channels, 1)
         self.softshrink = softshrink
         
     def complex_mul(self, input: torch.Tensor, weights: torch.Tensor) -> torch.Tensor:
@@ -57,22 +56,23 @@ class AdaptiveSpectralConvolution(nn.Module):
         assert input.shape[-1] == weights.shape[-2], f"Input and weight dimensions do not match. The last dimension of input is {input.shape[-1]} and the second-to-last dimension of weights is {weights.shape[-2]}"
         return torch.einsum('...bd, bdk -> ...bk', input, weights)
     
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def forward(self, x: torch.Tensor, shape) -> torch.Tensor:
         """
         Forward pass of the AdaptiveSpectralConvolution module.
 
         Args:
-            x (torch.Tensor): Input tensor.
+            x (torch.Tensor): Input tensor of shape [batch, spatial_size, hidden_channels]
 
         Returns:
             torch.Tensor: Output tensor.
         """
+        # print("AdaptiveSpectralConvolution, x.shape", x.shape)
         # Get the batch size, number of channels, and the size of the input
         B, N, C = x.shape 
         # Calculate the bias
         bias = self.bias(x.permute(0, 2, 1)).permute(0, 2, 1)
         # Reshape the input to [batch, x1_size, x2_size, ..., xN_size, hidden_channels]
-        x = x.reshape(B, *self.size, C)
+        x = x.reshape(B, *shape, C)
         # Compute the Fourier transform of the input
         x = torch.fft.rfftn(x, dim=[i for i in range(1, self.dimensions+1)], norm='ortho')
         x = x.reshape(B, *x.shape[1:-1], self.num_blocks, self.block_size)
@@ -91,8 +91,8 @@ class AdaptiveSpectralConvolution(nn.Module):
         
         # Compute the inverse Fourier transform
         x = torch.view_as_complex(x)
-        x = x.reshape(B, *x.shape[1:-2], self.hidden_size)
-        x = torch.fft.irfftn(x, s=self.size, dim=[i for i in range(1, self.dimensions+1)], norm='ortho')
+        x = x.reshape(B, *x.shape[1:-2], self.in_channels)
+        x = torch.fft.irfftn(x, s=shape, dim=[i for i in range(1, self.dimensions+1)], norm='ortho')
         x = x.reshape(B, N, C)
         x = x + bias
         return x
