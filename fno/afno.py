@@ -22,11 +22,11 @@ class FourierBlock(nn.Module):
         mlp (MLP): The MLP layer.
     """
 
-    def __init__(self, dim: int, img_size: list[int], mlp_ratio: float = 4.0, drop: float = 0.0, drop_path: float = 0.0, act_layer: nn.Module = nn.GELU, norm_layer: nn.Module = nn.LayerNorm, double_skip: bool = False):
+    def __init__(self, in_channels: int, dim: int, mlp_ratio: float = 4.0, drop: float = 0.0, drop_path: float = 0.0, act_layer: nn.Module = nn.GELU, norm_layer: nn.Module = nn.LayerNorm, double_skip: bool = False):
         """    
         Args:
         --------
-        * dim (int): 
+        * in_channels (int): 
             The number of input channels.
         * img_size (list[int]): 
             The size of the input image.
@@ -44,25 +44,25 @@ class FourierBlock(nn.Module):
             Whether to perform double skip connection. Default is False.
         """
         super().__init__()
+        self.in_channels = in_channels
         self.dim = dim
-        self.img_size = img_size
         self.mlp_ratio = mlp_ratio
         self.drop = drop
         self.act_layer = act_layer
         self.norm_layer = norm_layer
-        self.norm1 = self.norm_layer(self.dim)
+        self.norm1 = self.norm_layer(self.in_channels)
         self.double_skip = double_skip
         
         # Layers
-        self.spectral = AdaptiveSpectralConvolution(self.dim, self.img_size)
+        self.spectral = AdaptiveSpectralConvolution(self.in_channels, self.dim)
         self.drop_path = DropPath(drop_path) if drop_path > 0. else nn.Identity()
-        self.norm2 = self.norm_layer(self.dim)
-        self.mlp = MLP(in_features=self.dim, 
-                       hidden_size=int(self.dim * self.mlp_ratio), 
+        self.norm2 = self.norm_layer(self.in_channels)
+        self.mlp = MLP(in_features=self.in_channels, 
+                       hidden_size=int(self.in_channels * self.mlp_ratio), 
                        activation=self.act_layer, 
                        dropout=self.drop)
     
-    def forward(self, x):
+    def forward(self, x, shape):
         """
         Forward pass of the FourierBlock module.
 
@@ -73,9 +73,10 @@ class FourierBlock(nn.Module):
             torch.Tensor: The output tensor.
 
         """
+        # print("FourierBlock, x.shape", x.shape)
         residual = x
         x = self.norm1(x)
-        x = self.spectral(x)
+        x = self.spectral(x, shape)
         
         if self.double_skip:
             x += residual
