@@ -2,7 +2,7 @@ numpy
 scipy
 matplotlib
 pandas
-pytorch
+torch
 tensorboard
 einops
 timm
