@@ -12,7 +12,7 @@ class AdaptiveFourierNeuralOperator(nn.Module):
     """
     Adaptive Fourier Neural Operator (AFNO) model.
     """
-    def __init__(self, img_size: list[int], patch_size: Union[int, List[int]] = 8, in_channels: int = 1, out_channels: int = 1, embed_dim: int = 768, num_layers: int = 12, mlp_ratio: float = 4, uniform_drop: bool = False, drop_rate: float = 0, drop_path_rate: float = 0, norm_layer: nn.Module = None, dropcls: int = 0, checkpoints: bool = False):
+    def __init__(self, dim, patch_size: Union[int, List[int]] = 8, max_num_patches: int = 512, padding: Union[int, List[int]] = 0, in_channels: int = 1, out_channels: int = 1, embed_dim: int = 768, num_layers: int = 12, mlp_ratio: float = 4, uniform_drop: bool = False, drop_rate: float = 0, drop_path_rate: float = 0, norm_layer: nn.Module = None, dropcls: int = 0, checkpoints: bool = False):
         """
         Args:
         -----
@@ -44,13 +44,12 @@ class AdaptiveFourierNeuralOperator(nn.Module):
             Whether to use checkpoints. Defaults to False.
         """
         super().__init__()
-        if not img_size:
-            raise ValueError("Image size can't be None, please provide image size")
-        self.img_size = img_size
-        assert len(self.img_size) in [1, 2, 3], "Image dimensions must be 1, 2 or 3 dimensions. Higher dimensions are not supported yet."
+        self.dim = dim
+        assert dim in [1, 2, 3], "Image dimensions must be 1, 2 or 3 dimensions. Higher dimensions are not supported yet."
         self.patch_size = patch_size
-        self.in_channels = in_channels + len(img_size)
-        self.dim = len(img_size)
+        self.max_num_patches = max_num_patches
+        self.padding = padding
+        self.in_channels = in_channels + dim
         self.out_channels = out_channels
         self.embed_dim = embed_dim
         self.num_layers = num_layers
@@ -58,20 +57,31 @@ class AdaptiveFourierNeuralOperator(nn.Module):
         self.drop_rate = drop_rate
         self.checkpoints = checkpoints
         self.norm_layer = norm_layer or partial(nn.LayerNorm, eps=1e-6)
+        
+        # Padding
+        if isinstance(padding, int):
+            self.padding = [padding] * dim
+        elif isinstance(padding, list):
+            self.padding = padding
+        self.img_size = [size + pad for size, pad in zip(range(1, dim+1), self.padding)]
+        
         if isinstance(patch_size, int):
-            self.patch_size = [patch_size] * len(img_size)
+            self.patch_size = [patch_size] * dim
         elif isinstance(patch_size, list):
             self.patch_size = patch_size
-        self.size = list(size // patch_size for size, patch_size in zip(img_size, self.patch_size))
+        self.size = list(size // patch_size for size, patch_size in zip(range(1, dim+1), self.patch_size))
         
         # Patch embedding layer
-        self.patch_embed = PatchEmbedding(img_size=self.img_size,
+        self.patch_embed = PatchEmbedding(dim=self.dim,
                                           patch_size=self.patch_size,
                                           in_channels=self.in_channels,
-                                          embed_dim=self.embed_dim)
+                                          embed_dim=self.embed_dim,
+                                            max_patches=self.max_num_patches)
         self.num_patches = self.patch_embed.num_patches
         self.pos_embed = nn.Parameter(torch.zeros(1, self.num_patches, self.embed_dim))
         self.pos_drop = nn.Dropout(p=drop_rate)
+        
+        
         
         # Drop
         if uniform_drop:
@@ -80,12 +90,12 @@ class AdaptiveFourierNeuralOperator(nn.Module):
             self.drop = [x.item() for x in torch.linspace(0, drop_path_rate, self.num_layers)]
             
         # Fourier blocks
-        self.blocks = nn.ModuleList([FourierBlock(dim=self.embed_dim,
+        self.blocks = nn.ModuleList([FourierBlock(in_channels=self.embed_dim,
+                                                  dim=self.dim,
                                                   mlp_ratio=self.mlp_ratio,
                                                   drop=self.drop_rate,
                                                   drop_path=self.drop[i],
-                                                  norm_layer=self.norm_layer,
-                                                  img_size=self.size) for i in range(self.num_layers)])
+                                                  norm_layer=self.norm_layer) for i in range(self.num_layers)])
         
         # Norm layer
         self.norm = self.norm_layer(self.embed_dim)
@@ -104,18 +114,18 @@ class AdaptiveFourierNeuralOperator(nn.Module):
             self.decoder = nn.Sequential(OrderedDict([
                 ('conv1', nn.ConvTranspose2d(self.embed_dim, self.out_channels*16, kernel_size=(2, 2), stride=(2, 2))),
                 ('act1', nn.Tanh()),
-                ('conv2', nn.ConvTranspose2d(self.out_channels*16, self.out_channels*4, kernel_size=(2, 2), stride=(2, 2))),
+                ('conv2', nn.ConvTranspose2d(self.out_channels*16, self.out_channels*4, kernel_size=(1, 1), stride=(1, 1))),
                 ('act2', nn.Tanh()),
             ]))
-            self.head = nn.ConvTranspose2d(self.out_channels*4, self.out_channels, kernel_size=(2, 2), stride=(2, 2))
+            self.head = nn.ConvTranspose2d(self.out_channels*4, self.out_channels, kernel_size=(4, 4), stride=(4, 4))
         elif len(self.img_size) == 3:
             self.decoder = nn.Sequential(OrderedDict([
                 ('conv1', nn.ConvTranspose3d(self.embed_dim, self.out_channels*16, kernel_size=(2, 2, 2), stride=(2, 2, 2))),
                 ('act1', nn.Tanh()),
-                ('conv2', nn.ConvTranspose3d(self.out_channels*16, self.out_channels*4, kernel_size=(2, 2, 2), stride=(2, 2, 2))),
+                ('conv2', nn.ConvTranspose3d(self.out_channels*16, self.out_channels*4, kernel_size=(1, 1, 1), stride=(1, 1, 1))),
                 ('act2', nn.Tanh()),
             ]))
-            self.head = nn.ConvTranspose3d(self.out_channels*4, self.out_channels, kernel_size=(2, 2, 2), stride=(2, 2, 2))
+            self.head = nn.ConvTranspose3d(self.out_channels*4, self.out_channels, kernel_size=(1, 1, 1), stride=(1, 1, 1))
             
         if dropcls > 0:
             self.final_dropout = nn.Dropout(p=dropcls)
@@ -165,8 +175,10 @@ class AdaptiveFourierNeuralOperator(nn.Module):
         Returns:
             torch.Tensor: Output tensor of shape (B, embed_dim, x1', ..., xN'), where B is the batch size, embed_dim is the embedding dimension, and x1', ..., xN' are the dimensions of the output image.
         """
+        # print("AFNO, x.shape", x.shape)
         batch, channels, *sizes = x.shape
-        
+        sizes_padded = [size + pad for size, pad in zip(sizes, self.padding)]
+        num_patches = [size // patch for size, patch in zip(sizes_padded, self.patch_size)]
         # Grid addition
         for i in range(len(sizes)):
             self.set_grid(x)
@@ -179,21 +191,27 @@ class AdaptiveFourierNeuralOperator(nn.Module):
         x = torch.cat((*batched_grid, x), dim=-1)
         x = x.permute(0, -1, *range(1, len(x.size())-1))
         
+        if self.padding:
+            padd = [[x//2]*2 for x in self.padding]
+            padd = [item for sublist in padd for item in sublist]
+            padd = padd[::-1]
+            x = nn.functional.pad(x, padd)
+        
         # Patch embedding
         x = self.patch_embed(x)
-        x += self.pos_embed
+        x += self.pos_embed[:, :(x.shape[1]), :]
         x = self.pos_drop(x)
         
         # Fourier blocks
         if not self.checkpoints:
             for blk in self.blocks:
-                x = blk(x)
+                x = blk(x, num_patches)
         else:
             x = checkpoint_sequential(self.blocks, 4, x)
         
         # Norm layer
         x = self.norm(x).transpose(1, 2)
-        x = torch.reshape(x, [-1, self.embed_dim, *self.size])
+        x = torch.reshape(x, [-1, self.embed_dim, *num_patches])
         return x
     
     def forward(self, x):
@@ -201,15 +219,23 @@ class AdaptiveFourierNeuralOperator(nn.Module):
         Forward pass of the AFNONet model.
 
         Args:
-            x (torch.Tensor): Input tensor.
+            x (torch.Tensor): Input tensor. [B, C, x1, x2, ..., xN]
 
         Returns:
-            torch.Tensor: Output tensor.
+            torch.Tensor: Output tensor. [B, C', x1', x2', ..., xN']
         """
+        # print("AFNO, x.shape", x.shape)
         x = self.forward_features(x)
         x = self.final_dropout(x)
         x = self.decoder(x)
         x = self.head(x)
+
+        # Remove padding
+        if self.padding:
+            padd_slice = [slice(padd//2, -padd//2) if padd != 0 else slice(None) for padd in self.padding]
+            x = x[:, :, *padd_slice]
+            
+        
         return x
     
     def set_grid(self, x):
