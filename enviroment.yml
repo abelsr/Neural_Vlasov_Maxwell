@@ -2,13 +2,13 @@ name: neural_vlasov_maxwell
 channels:
   - defaults
 dependencies:
-  - python=3.10
+  - python=3.11
   - numpy
   - scipy
   - pandas
   - matplotlib
   - scipy
-  - pytorch
+  - torch
   - tensorboard
   - einops
   - timm
