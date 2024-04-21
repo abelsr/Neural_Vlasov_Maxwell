@@ -1,0 +1,1 @@
+from .fno_model import FNO
