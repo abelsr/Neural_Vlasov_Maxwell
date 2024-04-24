@@ -27,10 +27,10 @@ class SpectralConvolution(nn.Module):
         self.scale = 1 / (in_channels * out_channels)
         
         # Weights
-        self.weights = [
+        self.weights = nn.ParameterList([
             nn.Parameter(self.scale * torch.ones(in_channels, out_channels, *self.modes, dtype=torch.cfloat))
             for _ in range(2 ** (self.dim - 1))
-        ]
+        ])
         
     @staticmethod
     def complex_mult(input: torch.Tensor, weights: torch.Tensor) -> torch.Tensor:
