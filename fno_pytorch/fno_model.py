@@ -39,6 +39,7 @@ class FNO(nn.Module):
         self.padding = kwargs.get('padding', None)
         self.sizes = [0] * self.dim
         
+        
         # Format the padding
         if self.padding is not None:
             # Padd is a list of integers representing the padding along each dimension, so we need to convert it to a tuple
@@ -51,16 +52,16 @@ class FNO(nn.Module):
             
 
         # Lifting layer (P)
-        self.p = nn.Linear(self.in_channels + (self.dim if self.add_grid else 0), self.in_channels)
+        self.p = nn.Linear(self.in_channels + (self.dim if self.add_grid else 0), self.mid_channels )
 
         # Fourier blocks
         self.fourier_blocks = nn.ModuleList([
-            FourierBlock(modes, in_channels, in_channels, out_channels, activation)
+            FourierBlock(modes, mid_channels, mid_channels, out_channels, activation)
             for _ in range(num_fourier_layers)
         ])
 
         # Projection layer (Q)
-        self.q = nn.Linear(self.in_channels, self.mid_channels)
+        self.q = nn.Linear(self.mid_channels,self.mid_channels)
         self.final = nn.Linear(self.mid_channels, self.out_channels)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -73,8 +74,11 @@ class FNO(nn.Module):
         Returns:
             torch.Tensor: Output tensor. [batch, channels, *sizes]
         """
-        batch, channels, *sizes = x.size()
+        batch, in_channels, *sizes = x.size()
         assert len(sizes) == self.dim, "Input tensor must have the same number of dimensions as the number of modes. Got {} dimensions, expected {}.".format(len(sizes), self.dim)
+        
+        # Permute the dimensions [batch, channels, *sizes] -> [batch, *sizes, channels]
+        x = x.permute(0, *range(2, self.dim + 2), 1)
 
         # If grid is enabled, set the grid
         if self.add_grid:
@@ -82,8 +86,6 @@ class FNO(nn.Module):
             for i in range(len(sizes)):
                 if sizes[i] != self.sizes[i]:
                     break
-
-            x = x.reshape(batch, *sizes, channels)
             reshapes = [1] * len(x.size())
             reshapes[0] = batch
             batched_grid = [grid.repeat(reshapes) for grid in self.grids]
@@ -129,7 +131,7 @@ class FNO(nn.Module):
             x (torch.Tensor): Input tensor.
 
         """
-        batch, channels, *sizes = x.size()
+        batch, *sizes, in_channels = x.size()
         self.grids = []
         self.sizes = sizes
 
